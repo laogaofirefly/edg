@@ -11,13 +11,18 @@ os.chdir(ROOT)
 
 from edg03 import run
 
-
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 2 or sys.argv[1] in ("-h", "--help"):
         print("用法: python3 edg.py <file.edg>")
         print("示例: python3 edg.py examples/world_demo.edg")
-        return 2
-    return run(os.path.abspath(sys.argv[1]))
+        print("Termux 首次安装: pkg update && pkg install python")
+        return 0 if len(sys.argv) == 2 else 2
+    path = os.path.abspath(sys.argv[1])
+    if not os.path.isfile(path):
+        print(f"EDG error: file not found: {sys.argv[1]}", file=sys.stderr)
+        return 1
+    return run(path)
+
 
 
 if __name__ == "__main__":
