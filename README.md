@@ -72,6 +72,47 @@ py edg.py examples/hello.edg
 
 根目录 `edg.py` 会自动把 `src` 加入 Python 模块搜索路径，因此不需要手动设置 `PYTHONPATH`。
 
+### Termux 安装
+
+如果看到 `python3 is not installed`，执行：
+
+```bash
+pkg update
+pkg install python
+termux-setup-storage
+```
+
+项目提供了自动安装脚本：
+
+```bash
+bash install_termux.sh
+```
+
+运行脚本：
+
+```bash
+bash run_edg.sh examples/hello.edg
+```
+
+### 交互式 REPL
+
+不想先创建文件时，可以直接进入交互模式：
+
+```bash
+python3 edg.py --repl
+```
+
+输入代码后按一次空行执行：
+
+```text
+edg> let x = 2
+...   print(x + 3)
+...   
+5
+```
+
+输入 `:help` 查看帮助，输入 `:quit` 退出。
+
 ### 第一个程序
 
 创建 `hello.edg`：
@@ -106,6 +147,9 @@ EDG
 ```text
 edg/
 ├── edg.py                 # 推荐启动器
+├── edg_repl.py            # 交互式 REPL
+├── install_termux.sh      # Termux 安装辅助脚本
+├── run_edg.sh             # Termux 运行脚本
 ├── README.md              # 项目文档
 ├── .gitignore
 ├── examples/              # EDG 示例程序
