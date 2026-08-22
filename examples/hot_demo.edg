@@ -1,0 +1,5 @@
+let points_x = [0, 1, 2, 10]
+let points_y = [0, 1, 2, 10]
+
+print(hot.dist(0, 0, 3, 4))
+print(hot.in_circle(points_x, points_y, 0, 0, 3))

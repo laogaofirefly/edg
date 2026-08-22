@@ -1,0 +1,26 @@
+# EDG 综合测试
+let scores = [10, 20, 30]
+scores[0] += 5
+scores[1] = scores[0] * 2
+
+let player = [100, 3]
+player[0] = 75
+
+print("hp:", player[0])
+print("score0:", scores[0])
+print("score1:", scores[1])
+
+let total = 0
+for n in scores
+    if n == 30
+        continue
+    total += n
+
+print("total:", total)
+
+let i = 0
+while i < 5
+    i += 1
+    if i == 3
+        continue
+    print("loop:", i)
