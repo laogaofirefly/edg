@@ -10,20 +10,12 @@ if SRC not in sys.path:
 os.chdir(ROOT)
 
 from edg02 import EdgError, lines_of
-from edg03 import Compiler, Env, VM, edg_hot
+from edg03 import Compiler, Env, VM, edg_hot, install_builtins
 
 
 def make_env():
     env = Env()
-    env["print"] = lambda *x: print(*x)
-    env["len"] = len
-    env["range"] = lambda *x: list(range(*x))
-    env["type"] = lambda x: (
-        "nothing" if x is None else
-        "number" if isinstance(x, (int, float)) else
-        "text" if isinstance(x, str) else
-        "list" if isinstance(x, list) else "object"
-    )
+    install_builtins(env)
     if edg_hot is not None:
         env["hot"] = edg_hot
     return env
