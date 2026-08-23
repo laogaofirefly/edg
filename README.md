@@ -4,7 +4,7 @@ EDG（Embedded Dynamic Game language）是一门面向 Android 应用、2D/3D �
 
 它的目标是：用简洁的缩进语法描述游戏对象、规则和流程，再由宿主应用提供渲染、输入、音频、网络和设备能力。
 
-> 当前项目仍处于原型阶段。Native C 编译后端现在是唯一执行路径；Python VM 已移除。Rust 部分仍提供独立的高性能计算原型。
+> 当前项目仍处于原型阶段。Native C 编译后端是主要执行路径；Python 仅暂时作为编译器驱动，Rust 保留为高性能计算库，并通过稳定的 C ABI 接入。
 
 ## 目录
 
@@ -518,14 +518,62 @@ EDG error: name 'x' is not defined
 
 当前限制：没有完整静态类型系统、异常捕获语法、异步/协程、标准包管理器；模块搜索路径主要依赖当前工作目录；`let` 尚未实现真正不可变语义；Rust VM 尚未成为默认运行时；Android 图形、输入、音频和网络 API 仍需宿主层接入。
 
-## Rust 原型
+## Rust 高性能模块
+
+Rust 部分保留为可被 C/宿主调用的高性能动态库，导出函数声明位于 `include/edg_hot.h`，实现位于 `rust/src/lib.rs`。
+
+```bash
+make rust
+```
+
+也可以运行 Rust 自带示例：
 
 ```bash
 cd rust
 cargo run --release
 ```
 
-Rust 示例等价于遍历 `[1, 2, 3, 4]` 并输出 `10`。Rust 构建产物不应提交到 Git，`.gitignore` 已忽略 `rust/target/` 和常见动态库文件。
+Rust 示例等价于遍历 `[1, 2, 3, 4]` 并输出 `10`。C 或宿主接入时只依赖 `include/edg_hot.h`，不直接依赖 Rust 内部类型。Rust 构建产物不应提交到 Git，`.gitignore` 已忽略 `rust/target/` 和常见动态库文件。
+
+## 可选 Python 嵌入
+
+Python 被保留为可选嵌入层，不是 Native 核心的强制依赖。无 Python 时仍可使用 Native C 后端和 Rust 模块。
+
+```bash
+# 构建不带 Python 的宿主
+make host
+
+# 构建带 CPython 嵌入的宿主
+make host-python
+
+# 执行 Python 文件或代码
+./edg-host-python python scripts/game.py
+./edg-host-python eval "print(2 + 3)"
+```
+
+嵌入接口位于 `include/edg_python.h`，实现位于 `c/python_embed.c`。未定义 `EDG_WITH_PYTHON` 时，接口保留为空实现，核心仍可正常编译。
+
+## Native CLI 入口
+
+新增 `edgc` 作为稳定的 C 命令行入口。当前阶段它负责调用兼容 Python 编译器，生成的 Native 程序本身不依赖 Python：
+
+```bash
+make edgc
+./edgc check examples/native_basic.edg
+./edgc native examples/native_basic.edg -o /tmp/native-basic
+```
+
+这是迁移期间的兼容层，后续可将 `edgc.c` 内部替换为真正的 C Parser，而不改变命令行接口。
+
+## C/Rust 接口验证
+
+Rust 热点模块提供 C ABI 烟雾测试：
+
+```bash
+make smoke-rust
+```
+
+该测试会验证求和、点积、距离、批量移动和矩形检测接口。由于当前环境可能没有 Cargo，Rust 构建需要先安装 Rust 工具链。
 
 ## 开发与测试
 

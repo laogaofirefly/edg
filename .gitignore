@@ -7,3 +7,7 @@ rust/target/
 .env
 *.key
 *.pem
+edg-host
+edg-host-python
+edg-hot-smoke
+edgc
