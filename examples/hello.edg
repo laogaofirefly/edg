@@ -1,0 +1,9 @@
+let name = "EDG"
+let score = 10
+
+fn add(a, b)
+    return a + b
+
+if score > 5
+    print(name)
+    print(add(score, 20))

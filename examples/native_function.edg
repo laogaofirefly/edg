@@ -1,0 +1,8 @@
+fn add(a, b)
+    return a + b
+
+fn square(x)
+    return x * x
+
+print(add(20, 22))
+print(square(5))

@@ -1,0 +1,20 @@
+class Player
+    var kind = "player"
+
+    init(name, health = 100)
+        self.name = name
+        self.health = health
+
+    fn damage(value)
+        self.health -= value
+
+let player = Player("Hero")
+player.damage(25)
+print(player.name)
+print(player.health)
+
+let data = {name: "EDG", version: 5}
+print(data.name)
+print(data.version)
+print(len([1, 2, 3]))
+print(type(data))

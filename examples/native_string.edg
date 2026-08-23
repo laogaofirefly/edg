@@ -1,0 +1,3 @@
+let greeting = "hello EDG"
+print(greeting)
+print("native string")

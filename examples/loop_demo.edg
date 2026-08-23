@@ -1,0 +1,11 @@
+let total = 0
+
+for value in range(1, 5)
+    total += value
+
+print(total)
+
+let n = 3
+while n > 0
+    print(n)
+    n -= 1

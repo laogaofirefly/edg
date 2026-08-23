@@ -1,0 +1,9 @@
+let items = [1, 2, 3]
+items[0] = 10
+items[1] += 5
+print(items[0])
+print(items[1])
+
+let data = {"hp": 100}
+data["hp"] = 80
+print(data["hp"])
