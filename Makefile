@@ -4,7 +4,7 @@ CPPFLAGS ?= -Iinclude
 RUST_DIR := rust
 RUST_LIB := $(RUST_DIR)/target/release/libedg_hot.so
 
-.PHONY: rust rust-debug host host-python edgc smoke smoke-rust clean test
+.PHONY: rust rust-debug host host-python edgc smoke smoke-rust value-smoke clean test
 
 rust:
 	cargo build --manifest-path $(RUST_DIR)/Cargo.toml --release
@@ -26,6 +26,10 @@ smoke: host
 
 smoke-rust: rust
 	$(CC) $(CFLAGS) $(CPPFLAGS) c/edg_hot_smoke.c -L$(RUST_DIR)/target/release -ledg_hot -Wl,-rpath,'$$ORIGIN/$(RUST_DIR)/target/release' -o edg-hot-smoke
+
+value-smoke:
+	$(CC) $(CFLAGS) $(CPPFLAGS) c/edg_value.c c/edg_value_smoke.c -o edg-value-smoke
+	./edg-value-smoke
 
 
 test: rust
