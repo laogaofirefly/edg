@@ -147,7 +147,10 @@ class NativeCompiler:
                     start, stop, step = parts
                 else:
                     raise EdgError(f"line {line}: range expects 1 to 3 arguments")
-                self.emit(f"for (double {var} = {self.expr(parse_expr(start))}; {var} < {self.expr(parse_expr(stop))}; {var} += {self.expr(parse_expr(step))}) {{")
+                start_c = self.expr(parse_expr(start))
+                stop_c = self.expr(parse_expr(stop))
+                step_c = self.expr(parse_expr(step))
+                self.emit(f"for (double {var} = {start_c}; ({step_c}) > 0 ? {var} < {stop_c} : {var} > {stop_c}; {var} += {step_c}) {{")
                 self.loop_depth += 1
                 self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1
                 self.loop_depth -= 1; self.emit("}")
@@ -177,6 +180,10 @@ class NativeCompiler:
         if self.functions_code:
             self.lines[2:2] = self.functions_code
         return "".join(self.lines)
+
+
+def compile_source(source):
+    return NativeCompiler().compile(source)
 
 
 def compile_file(source_path, output):

@@ -81,6 +81,19 @@ def main():
         except (EdgError, OSError, ValueError) as exc:
             diagnostic(path, exc)
             return 1
+    if len(args) == 3 and args[0] == "emit-c":
+        from edg_native import compile_source
+        path, output = os.path.abspath(args[1]), os.path.abspath(args[2])
+        try:
+            with open(path, encoding="utf8") as f:
+                c_source = compile_source(f.read())
+            with open(output, "w", encoding="utf8") as f:
+                f.write(c_source)
+            print(f"OK: C source {args[2]}")
+            return 0
+        except (EdgError, OSError, ValueError) as exc:
+            diagnostic(path, exc)
+            return 1
     if len(args) == 2 and args[0] in ("run", "check", "dump"):
         command, filename = args
     elif len(args) == 1 and args[0] not in ("-h", "--help"):
@@ -91,6 +104,7 @@ def main():
         print("检查: python3 edg.py check <file.edg>")
         print("字节码: python3 edg.py dump <file.edg>")
         print("原生编译: python3 edg.py native <file.edg> [-o output]")
+        print("生成C代码: python3 edg.py emit-c <file.edg> <output.c>")
         print("测试: python3 edg.py test")
         print("交互模式: python3 edg.py --repl")
         print("旧用法: python3 edg.py <file.edg>")
