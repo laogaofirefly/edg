@@ -63,7 +63,7 @@ def main():
     if len(args) == 1 and args[0] == "test":
         import subprocess
         test_dir = os.path.join(ROOT, "tests")
-        scripts = ["test_runner.py", "test_errors.py"]
+        scripts = ["test_runner.py", "test_errors.py", "test_bytecode_lines.py"]
         status = 0
         for script in scripts:
             result = subprocess.run([sys.executable, os.path.join(test_dir, script)], cwd=ROOT)

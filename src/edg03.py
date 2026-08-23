@@ -44,10 +44,11 @@ class Compiler:
         self.chunk.constants.extend(other.constants)
         code_offset = len(self.chunk.code)
         relocatable = {'JUMP', 'JUMP_IF_FALSE', 'ITER_NEXT'}
-        for op, arg in other.code:
+        for index, (op, arg) in enumerate(other.code):
             if op == 'CONST': arg += offset
             elif op in relocatable and arg is not None: arg += code_offset
             self.chunk.code.append((op, arg))
+            self.chunk.lines.append(other.lines[index] if index < len(other.lines) else self.chunk.current_line)
     def compile_expr(self, node):
         if not isinstance(node,tuple): self.chunk.emit('CONST',self.chunk.const(node)); return
         kind=node[0]
