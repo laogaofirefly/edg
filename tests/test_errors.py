@@ -36,6 +36,7 @@ def check(name, source, fragments, command="run"):
 def main():
     cases = [
         ("undefined name", "let x = missing_name\n", ["name 'missing_name' is not defined", "^"]),
+        ("missing module", "import does_not_exist\n", ["module 'does_not_exist' not found", ":1:1"]),
         ("break outside loop", "break\n", ["break outside loop", ":1:"]),
         ("invalid function", "fn broken(\n", ["invalid function declaration", ":1:"]),
         ("index error", "let x = [1]\nprint(x[3])\n", ["list index out of range", "^"]),

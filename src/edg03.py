@@ -325,11 +325,22 @@ def load_module(name, base_dir, cache):
         module = importlib.import_module(name)
         cache[name] = {k: v for k, v in vars(module).items() if not k.startswith('_')}
         return cache[name]
-    path = os.path.join(base_dir, name + '.edg')
-    if not os.path.exists(path): raise EdgError(f"module '{name}' not found")
-    with open(path, encoding='utf8') as f: lines=lines_of(f.read())
-    compiler=Compiler(); chunk=compiler.compile_lines(lines); exports={}
-    env=Env(); install_builtins(env)
+    path = os.path.abspath(os.path.join(base_dir, name + '.edg'))
+    if not os.path.exists(path): raise EdgError(f"{path}:1:1: module '{name}' not found")
+    try:
+        with open(path, encoding='utf8') as f: lines=lines_of(f.read())
+        compiler=Compiler(); chunk=compiler.compile_lines(lines)
+    except EdgError as exc:
+        message = str(exc)
+        import re
+        if re.search(r':\d+:\d+:', message):
+            raise
+        match = re.search(r'line (\d+):\s*(.*)', message)
+        if match:
+            raise EdgError(f'{path}:{match.group(1)}:1: {match.group(2)}') from exc
+        raise EdgError(f'{path}:1:1: {message}') from exc
+    exports={}
+    env=Env(source_path=path); install_builtins(env)
     env['__file__'] = path
     if edg_hot is not None: env['hot']=edg_hot
     cache[name]=exports
