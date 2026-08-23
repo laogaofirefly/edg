@@ -427,7 +427,15 @@ def compile_file(source_path, output):
     with tempfile.TemporaryDirectory(prefix="edg-native-") as tmp:
         c_path = os.path.join(tmp, "program.c")
         with open(c_path, "w", encoding="utf8") as f: f.write(c_source)
-        result = subprocess.run([cc, "-O2", c_path, "-o", output], text=True, capture_output=True)
+        # Keep the shared C runtime in the native build during migration.
+        # Its public ABI is available to generated code as features move over.
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        shared_runtime = os.path.join(project_root, "c", "edg_value.c")
+        command = [cc, "-O2", "-I", os.path.join(project_root, "include"), c_path]
+        if os.path.isfile(shared_runtime):
+            command.append(shared_runtime)
+        command += ["-o", output]
+        result = subprocess.run(command, text=True, capture_output=True)
         if result.returncode:
             raise EdgError("C compiler failed: " + (result.stderr.strip() or result.stdout.strip()))
     return output
