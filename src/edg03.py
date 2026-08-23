@@ -96,6 +96,8 @@ class Compiler:
                     if dm: defaults[dm.group(1)]=eval_ast(parse_expr(dm.group(2)),Env()); j+=1; continue
                     raise EdgError(f'line {ml}: invalid class member')
                 self.chunk.emit('CONST',self.chunk.const(Class(m.group(1),methods,defaults))); self.chunk.emit('STORE',m.group(1)); continue
+            if text == 'pass':
+                self.chunk.emit('NOP'); i += 1; continue
             if text == 'break':
                 if not self.loop_stack: raise EdgError(f'line {line}: break outside loop')
                 self.loop_stack[-1]['breaks'].append(self.chunk.emit('JUMP',None)); i+=1; continue
@@ -319,7 +321,8 @@ class VM:
         f=Frame(chunk,env); c=chunk.code
         while f.ip<len(c):
             op,arg=c[f.ip]; f.ip+=1
-            if op=='CONST':f.stack.append(f.chunk.constants[arg])
+            if op=='NOP': pass
+            elif op=='CONST':f.stack.append(f.chunk.constants[arg])
             elif op=='LOAD':f.stack.append(env.getv(arg))
             elif op=='IMPORT': f.stack.append(load_module(arg, self.base_dir, self.cache))
             elif op=='EXPORT':
