@@ -18,12 +18,14 @@ class NativeCompiler:
     def __init__(self):
         self.lines = ["#include <stdio.h>\n", "#include <stdbool.h>\n", "#include <stdlib.h>\n", "#include <string.h>\n", "\n", "static char *edg_num_to_str(double x) {\n", "    char *s = malloc(64);\n", "    if (!s) return NULL;\n", "    snprintf(s, 64, \"%g\", x);\n", "    return s;\n", "}\n"]
         self.lines += ["\n", "static char *edg_concat(const char *a, const char *b) {\n", "    size_t n = strlen(a) + strlen(b) + 1;\n", "    char *s = malloc(n);\n", "    if (!s) return NULL;\n", "    strcpy(s, a);\n", "    strcat(s, b);\n", "    return s;\n", "}\n"]
+        self.lines += ["\n", "static double edg_array_get(const double *a, size_t n, int i) {\n", "    if (i < 0 || (size_t)i >= n) {\n", "        fprintf(stderr, \"EDG array index out of bounds: %d (length %zu)\\n\", i, n);\n", "        exit(1);\n", "    }\n", "    return a[i];\n", "}\n", "\n", "static void edg_array_set(double *a, size_t n, int i, double value) {\n", "    if (i < 0 || (size_t)i >= n) {\n", "        fprintf(stderr, \"EDG array index out of bounds: %d (length %zu)\\n\", i, n);\n", "        exit(1);\n", "    }\n", "    a[i] = value;\n", "}\n"]
         self.functions_code = []
         self.target = self.lines
         self.indent = 1
         self.names = set()
         self.string_names = set()
         self.array_names = set()
+        self.array_lengths = {}
         self.functions = set()
         self.return_mode = False
         self.loop_depth = 0
@@ -68,7 +70,10 @@ class NativeCompiler:
         if kind == "index":
             base, index = node[1], node[2]
             if isinstance(base, tuple) and base[0] == "name" and base[1] in self.array_names:
-                return f"{self.expr(base)}[(int)({self.expr(index)})]"
+                name = base[1]
+                idx = self.expr(index)
+                length = self.array_lengths[name]
+                return f"edg_array_get({name}, {length}, (int)({idx}))"
             raise EdgError("native indexing is supported for numeric arrays only")
         if kind == "unary": return f"({node[1]}{self.expr(node[2])})"
         if kind == "bin":
@@ -100,7 +105,7 @@ class NativeCompiler:
                 if name == "len" and len(node[2]) == 1:
                     arg = node[2][0]
                     if isinstance(arg, tuple) and arg[0] == "name" and arg[1] in self.array_names:
-                        raise EdgError("native array length requires a fixed-size array declaration")
+                        return repr(float(self.array_lengths[arg[1]]))
                 if name in self.functions:
                     return f"{name}({', '.join(self.expr(a) for a in node[2])})"
             raise EdgError("native backend does not support this function call")
@@ -167,6 +172,7 @@ class NativeCompiler:
                     if not items or any(self.is_string(x) for x in items):
                         raise EdgError(f"line {line}: native arrays require non-empty numeric elements")
                     self.array_names.add(name)
+                    self.array_lengths[name] = len(items)
                     self.emit(f"double {name}[{len(items)}] = {self.expr(node)};")
                 else:
                     self.emit(f"double {name} = {self.expr(node)};")
@@ -176,7 +182,8 @@ class NativeCompiler:
                 name, index, rhs = m.groups()
                 if name not in self.array_names:
                     raise EdgError(f"line {line}: native indexed assignment requires an array")
-                self.emit(f"{name}[(int)({self.expr(parse_expr(index))})] = {self.expr(parse_expr(rhs))};")
+                idx = self.expr(parse_expr(index))
+                self.emit(f"edg_array_set({name}, {self.array_lengths[name]}, (int)({idx}), {self.expr(parse_expr(rhs))});")
                 i += 1; continue
             m = re.fullmatch(r"([A-Za-z_]\w*)\s*(=|\+=|-=|\*=|/=)\s*(.+)", text)
             if m:

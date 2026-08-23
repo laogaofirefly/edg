@@ -37,6 +37,12 @@ print(values[1])
 values[2] = 42
 print(values[2])
 """) == "20\n42\n"
+assert run_native("""let values = [1, 2]
+print(len(values))
+""") == "2\n"
+assert run_native("""let values = [1, 2]
+print(values[0])
+""") == "1\n"
 assert run_native("""let total = 0
 for i in range(5, 0, -2)
     total += i
