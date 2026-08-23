@@ -15,12 +15,16 @@ from edg02 import EdgError, lines_of, parse_expr
 
 class NativeCompiler:
     def __init__(self):
-        self.lines = ["#include <stdio.h>\n", "#include <stdbool.h>\n", "int main(void) {\n"]
+        self.lines = ["#include <stdio.h>\n", "#include <stdbool.h>\n"]
+        self.functions_code = []
+        self.target = self.lines
         self.indent = 1
         self.names = set()
+        self.functions = set()
+        self.return_mode = False
 
     def emit(self, text):
-        self.lines.append("    " * self.indent + text + "\n")
+        self.target.append("    " * self.indent + text + "\n")
 
     def expr(self, node):
         if not isinstance(node, tuple):
@@ -43,9 +47,42 @@ class NativeCompiler:
             if isinstance(fn, tuple) and fn[0] == "name":
                 name = fn[1]
                 if name == "abs" and len(node[2]) == 1:
-                    return f"(({self.expr(node[2][0])}) < 0 ? -({self.expr(node[2][0])}) : ({self.expr(node[2][0])}))"
+                    x = self.expr(node[2][0])
+                    return f"(({x}) < 0 ? -({x}) : ({x}))"
+                if name in self.functions:
+                    return f"{name}({', '.join(self.expr(a) for a in node[2])})"
             raise EdgError("native backend does not support this function call")
         raise EdgError("native backend supports only numeric expressions")
+
+    def function(self, rows, index, level):
+        text = rows[index][1]
+        m = re.fullmatch(r"fn\s+([A-Za-z_]\w*)\s*\((.*?)\)", text)
+        if not m:
+            raise EdgError(f"line {rows[index][2]}: invalid native function declaration")
+        name, raw_params = m.groups()
+        params = [x.strip() for x in raw_params.split(',') if x.strip()]
+        if any(not re.fullmatch(r"[A-Za-z_]\w*", p) for p in params):
+            raise EdgError(f"line {rows[index][2]}: invalid native function parameter")
+        self.functions.add(name)
+        body, end = self._nested(rows, index + 1, level)
+        old_target = self.target
+        self.target = self.functions_code
+        self.emit(f"double {name}({', '.join('double ' + p for p in params)}) {{")
+        self.indent += 1
+        old = self.return_mode; self.return_mode = True
+        self.block(body, 0, -1)
+        self.return_mode = old
+        self.emit("return 0.0;")
+        self.indent -= 1; self.emit("}")
+        self.target = old_target
+        return end
+
+    def _nested(self, rows, start, parent):
+        if start >= len(rows) or rows[start][0] <= parent:
+            raise EdgError(f"line {rows[start - 1][2]}: expected indented block")
+        i = start
+        while i < len(rows) and rows[i][0] > parent: i += 1
+        return rows[start:i], i
 
     def block(self, rows, start=0, parent=-1):
         i = start
@@ -53,6 +90,13 @@ class NativeCompiler:
             level, text, line = rows[i]
             if level <= parent: break
             # EDG 使用实际空格宽度表示缩进；子块只需比父块更深。
+            if text.startswith("fn ") and not self.return_mode:
+                i = self.function(rows, i, level); continue
+            if text == "return" or text.startswith("return "):
+                if not self.return_mode:
+                    raise EdgError(f"line {line}: return outside function")
+                rhs = "0.0" if text == "return" else self.expr(parse_expr(text[7:]))
+                self.emit(f"return {rhs};"); i += 1; continue
             if text.startswith("let ") or text.startswith("var "):
                 m = re.fullmatch(r"(?:let|var)\s+([A-Za-z_]\w*)\s*=\s*(.+)", text)
                 if not m: raise EdgError(f"line {line}: invalid native declaration")
@@ -66,9 +110,8 @@ class NativeCompiler:
                 i += 1; continue
             m = re.fullmatch(r"print\((.*)\)", text)
             if m:
-                args = [x.strip() for x in m.group(1).split(",") if x.strip()]
-                if len(args) != 1: raise EdgError(f"line {line}: native print accepts one argument")
-                self.emit(f"printf(\"%g\\n\", {self.expr(parse_expr(args[0]))});")
+                value = self.expr(parse_expr(m.group(1).strip()))
+                self.emit(f"printf(\"%g\\n\", {value});")
                 i += 1; continue
             if text.startswith("if "):
                 condition = text[3:].strip()
@@ -95,8 +138,18 @@ class NativeCompiler:
 
     def compile(self, source):
         rows = lines_of(source)
+        # 预扫描函数名，允许函数在调用点之前或之后声明。
+        for level, text, line in rows:
+            m = re.fullmatch(r"fn\s+([A-Za-z_]\w*)\s*\(.*?\)", text)
+            if m: self.functions.add(m.group(1))
+        self.lines.append("\n".join(self.functions_code)) if self.functions_code else None
+        self.lines.append("int main(void) {\n")
+        self.target = self.lines
         self.block(rows, 0, -1)
         self.lines.append("    return 0;\n}\n")
+        # 函数体是在主函数编译过程中收集的，插入到 main 之前。
+        if self.functions_code:
+            self.lines[2:2] = self.functions_code
         return "".join(self.lines)
 
 
