@@ -42,6 +42,10 @@ int edg_value_array_get(const EdgValue *value, size_t index, EdgValue *out);
 int edg_value_array_set(EdgValue *value, size_t index, const EdgValue *item);
 int edg_value_array_push(EdgValue *value, const EdgValue *item);
 int edg_value_array_pop(EdgValue *value, EdgValue *out);
+int edg_value_array_clear(EdgValue *value);
+int edg_value_array_compact(EdgValue *value);
+int edg_value_array_contains(const EdgValue *value, const EdgValue *item);
+char *edg_value_to_string(const EdgValue *value);
 int edg_value_truthy(const EdgValue *value);
 
 #ifdef __cplusplus

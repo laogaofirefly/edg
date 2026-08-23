@@ -1,6 +1,7 @@
 #include "edg_value.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 typedef struct {
     size_t length;
@@ -103,6 +104,38 @@ int edg_value_array_pop(EdgValue *v, EdgValue *out) {
     EdgArray *a = v && v->type == EDG_VALUE_ARRAY ? v->as.object : NULL;
     if (!a || !a->length || !out) return 0;
     *out = a->items[--a->length]; a->items[a->length] = edg_value_nothing(); return 1;
+}
+int edg_value_array_clear(EdgValue *v) {
+    EdgArray *a = v && v->type == EDG_VALUE_ARRAY ? v->as.object : NULL;
+    if (!a) return 0;
+    for (size_t i = 0; i < a->length; ++i) edg_value_free(&a->items[i]);
+    a->length = 0; return 1;
+}
+int edg_value_array_compact(EdgValue *v) {
+    EdgArray *a = v && v->type == EDG_VALUE_ARRAY ? v->as.object : NULL;
+    if (!a) return 0;
+    if (a->length == 0) { free(a->items); a->items = NULL; a->capacity = 0; return 1; }
+    if (a->capacity > a->length) {
+        EdgValue *p = realloc(a->items, a->length * sizeof(*p));
+        if (p) { a->items = p; a->capacity = a->length; }
+    }
+    return 1;
+}
+int edg_value_array_contains(const EdgValue *v, const EdgValue *item) {
+    EdgArray *a = v && v->type == EDG_VALUE_ARRAY ? v->as.object : NULL;
+    if (!a || !item) return 0;
+    for (size_t i = 0; i < a->length; ++i) if (edg_value_equal(&a->items[i], item)) return 1;
+    return 0;
+}
+char *edg_value_to_string(const EdgValue *v) {
+    char buffer[64];
+    if (!v) return edg_strdup("");
+    if (v->type == EDG_VALUE_STRING) return edg_strdup(v->as.string);
+    if (v->type == EDG_VALUE_BOOL) return edg_strdup(v->as.boolean ? "true" : "false");
+    if (v->type == EDG_VALUE_NOTHING) return edg_strdup("nothing");
+    if (v->type == EDG_VALUE_NUMBER) { snprintf(buffer, sizeof(buffer), "%g", v->as.number); return edg_strdup(buffer); }
+    if (v->type == EDG_VALUE_ARRAY) return edg_strdup("[array]");
+    return edg_strdup("[value]");
 }
 int edg_value_truthy(const EdgValue *v) {
     if (!v || v->type == EDG_VALUE_NOTHING) return 0;
