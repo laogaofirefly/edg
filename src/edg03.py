@@ -290,6 +290,12 @@ def _method(receiver, name):
     return None
 
 
+def runtime_error(env, message):
+    if env.source_path and env.current_line:
+        return EdgError(f'{env.source_path}:{env.current_line}:1: {message}')
+    return EdgError(message)
+
+
 def binary(op,a,b):
     if op=='??': return a if a is not None else b
     if op=='+': return a+b
@@ -381,7 +387,10 @@ class VM:
                 else:
                     method = _method(a, arg)
                     f.stack.append(method if method is not None else getattr(a, arg, None))
-            elif op=='INDEX':b=f.stack.pop();a=f.stack.pop();f.stack.append(a[b])
+            elif op=='INDEX':
+                b=f.stack.pop(); a=f.stack.pop()
+                try: f.stack.append(a[b])
+                except (TypeError, KeyError, IndexError) as e: raise runtime_error(f.env, f'cannot index value: {e}')
             elif op=='DUP2':
                 # [obj, index] -> [obj, index, obj, index]
                 obj, index = f.stack[-2], f.stack[-1]; f.stack.extend([obj, index])
@@ -434,7 +443,23 @@ def run(path):
             # install_builtins 已安装 len/range/type 及其他基础函数
         vm=VM({}, base_dir=source_dir); vm.run(chunk,env); return 0
     except (EdgError,FileNotFoundError,TypeError,KeyError,IndexError,StopIteration) as e:
-        print('EDG error:',e,file=sys.stderr); return 1
+        message = str(e)
+        import re
+        location = re.search(r'line (\d+):\s*(.*)', message)
+        if location and not re.search(r':\d+:\d+:', message):
+            line_no, detail = int(location.group(1)), location.group(2)
+            message = f'{os.path.abspath(path)}:{line_no}:1: {detail}'
+        print('EDG error:', message, file=sys.stderr)
+        match = re.search(r'(.+):(\d+):\d+:', message)
+        if match:
+            try:
+                with open(match.group(1), encoding='utf8') as source:
+                    source_line = source.read().splitlines()[int(match.group(2)) - 1]
+                print('    ' + source_line, file=sys.stderr)
+                print('    ^', file=sys.stderr)
+            except (OSError, IndexError):
+                pass
+        return 1
 
 if __name__=='__main__':
     if len(sys.argv)!=2: print('usage: python3 src/edg03.py file.edg'); sys.exit(2)
