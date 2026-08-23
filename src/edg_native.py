@@ -23,6 +23,8 @@ class NativeCompiler:
         self.functions = set()
         self.return_mode = False
         self.loop_depth = 0
+        self.function_has_return = False
+        self.function_depth = 0
 
     def emit(self, text):
         self.target.append("    " * self.indent + text + "\n")
@@ -67,15 +69,20 @@ class NativeCompiler:
         self.functions.add(name)
         body, end = self._nested(rows, index + 1, level)
         old_target = self.target
+        old_depth = self.function_depth
+        self.function_depth += 1
         self.target = self.functions_code
         self.emit(f"double {name}({', '.join('double ' + p for p in params)}) {{")
         self.indent += 1
-        old = self.return_mode; self.return_mode = True
+        old = self.return_mode; old_return = self.function_has_return
+        self.return_mode = True; self.function_has_return = False
         self.block(body, 0, -1)
-        self.return_mode = old
-        self.emit("return 0.0;")
+        self.return_mode = old; has_return = self.function_has_return; self.function_has_return = old_return
+        if not has_return:
+            self.emit("return 0.0;")
         self.indent -= 1; self.emit("}")
         self.target = old_target
+        self.function_depth = old_depth
         return end
 
     def _nested(self, rows, start, parent):
@@ -97,7 +104,7 @@ class NativeCompiler:
                 if not self.return_mode:
                     raise EdgError(f"line {line}: return outside function")
                 rhs = "0.0" if text == "return" else self.expr(parse_expr(text[7:]))
-                self.emit(f"return {rhs};"); i += 1; continue
+                self.emit(f"return {rhs};"); self.function_has_return = True; i += 1; continue
             if text.startswith("let ") or text.startswith("var "):
                 m = re.fullmatch(r"(?:let|var)\s+([A-Za-z_]\w*)\s*=\s*(.+)", text)
                 if not m: raise EdgError(f"line {line}: invalid native declaration")
@@ -147,6 +154,11 @@ class NativeCompiler:
                     start, stop, step = parts
                 else:
                     raise EdgError(f"line {line}: range expects 1 to 3 arguments")
+                try:
+                    if float(step) == 0:
+                        raise EdgError(f"line {line}: range step cannot be zero")
+                except ValueError:
+                    pass
                 start_c = self.expr(parse_expr(start))
                 stop_c = self.expr(parse_expr(stop))
                 step_c = self.expr(parse_expr(step))
