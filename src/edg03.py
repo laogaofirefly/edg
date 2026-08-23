@@ -6,14 +6,24 @@ try:
     import edg_hot
 except ImportError:
     edg_hot = None
-
 class Chunk:
-    def __init__(self): self.code=[]; self.constants=[]
+    def __init__(self):
+        self.code=[]; self.constants=[]; self.lines=[]; self.current_line=0
     def emit(self, op, arg=None):
-        self.code.append((op,arg)); return len(self.code)-1
+        self.code.append((op,arg)); self.lines.append(self.current_line); return len(self.code)-1
     def patch(self, pos, target): self.code[pos]=(self.code[pos][0],target)
     def const(self, value):
         self.constants.append(value); return len(self.constants)-1
+    def disassemble(self, title='main'):
+        lines=[f'== {title} ==']
+        for index,(op,arg) in enumerate(self.code):
+            if op == 'CONST' and 0 <= arg < len(self.constants):
+                detail=f'{arg} ({self.constants[arg]!r})'
+            else:
+                detail='' if arg is None else repr(arg)
+            lines.append(f'{index:04d}  {op:<14} {detail}')
+        return "\n".join(lines)
+
 
 def parameter_specs(text):
     result=[]
@@ -66,6 +76,7 @@ class Compiler:
         i=0
         while i<len(lines):
             indent,text,line=lines[i]
+            self.chunk.current_line = line
             if text.startswith('import '):
                 import re
                 module=re.fullmatch(r'import\s+([A-Za-z_]\w*)',text)
@@ -196,11 +207,15 @@ class Frame:
     def __init__(self,chunk,env): self.chunk=chunk; self.env=env; self.stack=[]; self.ip=0
 
 class Env(dict):
-    def __init__(self,parent=None): super().__init__(); self.parent=parent
+    def __init__(self,parent=None, source_path=None):
+        super().__init__(); self.parent=parent
+        self.source_path = source_path or (parent.source_path if parent else None)
+        self.current_line = 0
     def getv(self,k):
         if k in self:return self[k]
         if self.parent:return self.parent.getv(k)
-        raise EdgError(f"name '{k}' is not defined")
+        where = f'{self.source_path}:{self.current_line}:1: ' if self.source_path and self.current_line else ''
+        raise EdgError(f"{where}name '{k}' is not defined")
 class ByteFunction:
     def __init__(self,name,params,chunk,closure):
         self.name=name; self.params=params; self.chunk=chunk; self.closure=closure
@@ -320,7 +335,10 @@ class VM:
     def run(self,chunk,env,exports=None):
         f=Frame(chunk,env); c=chunk.code
         while f.ip<len(c):
-            op,arg=c[f.ip]; f.ip+=1
+            op,arg=c[f.ip]
+            source_line = f.chunk.lines[f.ip] if f.ip < len(f.chunk.lines) else 0
+            f.env.current_line = source_line
+            f.ip+=1
             if op=='NOP': pass
             elif op=='CONST':f.stack.append(f.chunk.constants[arg])
             elif op=='LOAD':f.stack.append(env.getv(arg))
@@ -402,7 +420,7 @@ def install_builtins(env):
 def run(path):
     try:
         with open(path,encoding='utf8') as f: lines=lines_of(f.read())
-        compiler=Compiler(); chunk=compiler.compile_lines(lines); env=Env()
+        compiler=Compiler(); chunk=compiler.compile_lines(lines); env=Env(source_path=os.path.abspath(path))
         install_builtins(env)
         source_dir = os.path.dirname(os.path.abspath(path))
         env['__file__'] = path
