@@ -69,6 +69,18 @@ def main():
             result = subprocess.run([sys.executable, os.path.join(test_dir, script)], cwd=ROOT)
             status = status or result.returncode
         return status
+    if len(args) >= 2 and args[0] == "native":
+        from edg_native import compile_file
+        filename = args[1]
+        output = args[3] if len(args) == 4 and args[2] == "-o" else os.path.splitext(filename)[0]
+        path = os.path.abspath(filename)
+        try:
+            compile_file(path, os.path.abspath(output))
+            print(f"OK: native executable {output}")
+            return 0
+        except (EdgError, OSError, ValueError) as exc:
+            diagnostic(path, exc)
+            return 1
     if len(args) == 2 and args[0] in ("run", "check", "dump"):
         command, filename = args
     elif len(args) == 1 and args[0] not in ("-h", "--help"):
@@ -78,6 +90,7 @@ def main():
         print("用法: python3 edg.py run <file.edg>")
         print("检查: python3 edg.py check <file.edg>")
         print("字节码: python3 edg.py dump <file.edg>")
+        print("原生编译: python3 edg.py native <file.edg> [-o output]")
         print("测试: python3 edg.py test")
         print("交互模式: python3 edg.py --repl")
         print("旧用法: python3 edg.py <file.edg>")
