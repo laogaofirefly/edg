@@ -43,7 +43,8 @@ EDG（Embedded Dynamic Game language）是一门面向 Android 应用、2D/3D �
 - 属性访问、可选属性访问和下标访问
 - 类、实例、字段、方法和 `init` 构造函数
 - `.edg` 模块导入和 `export`
-- `print`、`len`、`range`、`type` 内置函数
+- `print`、`len`、`range`、`type`、`min`、`max`、`sum`、`abs`、`str`、`int`、`float`、`bool` 内置函数
+- 字符串、列表、字典常用方法
 - `world` 游戏世界模块
 - Rust 加速的批量移动、范围检测和空间查询（如果动态库存在）
 
@@ -272,6 +273,32 @@ print(damage(5))
 ```
 
 函数可以访问声明时所在环境中的变量。当前不支持命名参数、可变参数和异常捕获语法。
+
+## 常用方法
+
+EDG 为基础容器提供常用方法：
+
+```edg
+let text = " hello edg "
+print(text.trim().upper())
+print(text.contains("edg"))
+print(text.replace("edg", "world"))
+
+let values = [1, 2, 3]
+values.push(4)
+print(values.join("-"))
+print(values.pop())
+
+let player = {"hp": 100}
+print(player.has("hp"))
+print(player.get("mana", 0))
+```
+
+字符串方法：`upper`、`lower`、`trim`、`contains`、`starts_with`、`ends_with`、`split`、`replace`。
+
+列表方法：`push`、`pop`、`contains`、`join`、`reverse`、`clear`。
+
+字典方法：`has`、`get`、`keys`、`values`。
 
 ## 控制流
 
