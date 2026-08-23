@@ -9,23 +9,43 @@ if SRC not in sys.path:
     sys.path.insert(0, SRC)
 os.chdir(ROOT)
 
-from edg03 import run
+from edg02 import EdgError, lines_of
+from edg03 import Compiler, run
+
+
+def check(path):
+    """只解析和编译，不执行程序。"""
+    try:
+        with open(path, encoding="utf8") as f:
+            Compiler().compile_lines(lines_of(f.read()))
+        print(f"OK: {path}")
+        return 0
+    except (EdgError, OSError, TypeError, ValueError) as exc:
+        print(f"EDG check error: {exc}", file=sys.stderr)
+        return 1
+
 
 def main():
-    if len(sys.argv) == 2 and sys.argv[1] in ("--repl", "-i"):
+    args = sys.argv[1:]
+    if args in (["--repl"], ["-i"]):
         from edg_repl import main as repl_main
         return repl_main()
-    if len(sys.argv) != 2 or sys.argv[1] in ("-h", "--help"):
-        print("用法: python3 edg.py <file.edg>")
+    if len(args) == 2 and args[0] in ("run", "check"):
+        command, filename = args
+    elif len(args) == 1 and args[0] not in ("-h", "--help"):
+        # 保留旧用法：edg.py file.edg 等价于 edg.py run file.edg
+        command, filename = "run", args[0]
+    else:
+        print("用法: python3 edg.py run <file.edg>")
+        print("检查: python3 edg.py check <file.edg>")
         print("交互模式: python3 edg.py --repl")
-        print("示例: python3 edg.py examples/world_demo.edg")
-        print("Termux 首次安装: pkg update && pkg install python")
-        return 0 if len(sys.argv) == 2 else 2
-    path = os.path.abspath(sys.argv[1])
+        print("旧用法: python3 edg.py <file.edg>")
+        return 0 if args in (["-h"], ["--help"]) else 2
+    path = os.path.abspath(filename)
     if not os.path.isfile(path):
-        print(f"EDG error: file not found: {sys.argv[1]}", file=sys.stderr)
+        print(f"EDG error: file not found: {filename}", file=sys.stderr)
         return 1
-    return run(path)
+    return check(path) if command == "check" else run(path)
 
 
 

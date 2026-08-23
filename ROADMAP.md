@@ -1,0 +1,43 @@
+# EDG 走向真正编程语言的路线图
+
+## 阶段 1：语言基础冻结
+
+- [x] 词法分析、表达式解析、缩进代码块
+- [x] 函数、类、模块、字节码 VM
+- [x] 基础容器和标准函数
+- [ ] 统一 AST，不再让 edg02 和 edg03 各自维护语义
+- [ ] 补齐 `pass`、`else`、`break`、`continue` 的边界行为
+- [ ] 明确变量作用域和赋值规则
+
+## 阶段 2：编译器质量
+
+- [ ] Token 保存文件、行、列、长度
+- [ ] 统一的 `SyntaxError`、`NameError`、`TypeError`、`RuntimeError`
+- [ ] 错误显示源代码行和 `^` 指针
+- [ ] AST pretty printer 和字节码反汇编器
+- [ ] 端到端回归测试
+
+## 阶段 3：真正的标准库
+
+- [ ] `std.text`、`std.collections`、`std.math`
+- [ ] JSON 编解码
+- [ ] 文件 API（权限控制）
+- [ ] 时间和随机数 API
+- [ ] 包清单和模块搜索路径
+
+## 阶段 4：工具链
+
+- [ ] `edg run file.edg`
+- [ ] `edg repl`
+- [ ] `edg check file.edg`
+- [ ] `edg format file.edg`
+- [ ] `edg test`
+- [ ] VS Code / LSP 基础支持
+
+## 阶段 5：性能和发布
+
+- [ ] 优化字节码 VM
+- [ ] Rust VM 与同一字节码格式兼容
+- [ ] 可选打包为单文件程序
+- [ ] 沙箱、权限和资源限制
+- [ ] 发布 EDG 1.0 语言规范
