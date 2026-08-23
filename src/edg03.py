@@ -232,6 +232,47 @@ class Class:
         return obj
 
 
+def _method(receiver, name):
+    """为字符串、列表和字典提供稳定的 EDG 方法 API。"""
+    if isinstance(receiver, str):
+        methods = {
+            'upper': lambda: receiver.upper(),
+            'lower': lambda: receiver.lower(),
+            'trim': lambda: receiver.strip(),
+            'contains': lambda value: value in receiver,
+            'starts_with': lambda value: receiver.startswith(value),
+            'ends_with': lambda value: receiver.endswith(value),
+            'split': lambda sep=',': receiver.split(sep),
+            'replace': lambda old, new: receiver.replace(old, new),
+        }
+        if name in methods: return methods[name]
+    if isinstance(receiver, list):
+        if name == 'push':
+            def push(value):
+                receiver.append(value)
+                return receiver
+            return push
+        if name == 'pop': return lambda: receiver.pop()
+        if name == 'contains': return lambda value: value in receiver
+        if name == 'join': return lambda sep=',': sep.join(str(x) for x in receiver)
+        if name == 'reverse':
+            def reverse():
+                receiver.reverse()
+                return receiver
+            return reverse
+        if name == 'clear':
+            def clear():
+                receiver.clear()
+                return receiver
+            return clear
+    if isinstance(receiver, dict):
+        if name == 'has': return lambda key: key in receiver
+        if name == 'get': return lambda key, default=None: receiver.get(key, default)
+        if name == 'keys': return lambda: list(receiver.keys())
+        if name == 'values': return lambda: list(receiver.values())
+    return None
+
+
 def binary(op,a,b):
     if op=='??': return a if a is not None else b
     if op=='+': return a+b
@@ -250,6 +291,7 @@ def binary(op,a,b):
     raise EdgError(f'unknown operator {op}')
 
 def load_module(name, base_dir, cache):
+    """按主程序所在目录加载 EDG 模块，并缓存模块结果。"""
     if name in cache: return cache[name]
     # Python 标准模块桥接：用于 World、Android 和图形运行时。
     if name in ('world', 'game'):
@@ -261,22 +303,25 @@ def load_module(name, base_dir, cache):
     if not os.path.exists(path): raise EdgError(f"module '{name}' not found")
     with open(path, encoding='utf8') as f: lines=lines_of(f.read())
     compiler=Compiler(); chunk=compiler.compile_lines(lines); exports={}
-    env=Env(); env['print']=lambda *x:print(*x); env['len']=len
+    env=Env(); install_builtins(env)
+    env['__file__'] = path
     if edg_hot is not None: env['hot']=edg_hot
     cache[name]=exports
-    VM().run(chunk,env,exports)
+    VM(cache, base_dir=os.path.dirname(path)).run(chunk,env,exports)
     if not exports: exports.update({k:v for k,v in env.items() if not k.startswith('_')})
     return exports
 
 class VM:
-    def __init__(self, cache=None): self.cache=cache if cache is not None else {}
+    def __init__(self, cache=None, base_dir=None):
+        self.cache = cache if cache is not None else {}
+        self.base_dir = base_dir or os.getcwd()
     def run(self,chunk,env,exports=None):
         f=Frame(chunk,env); c=chunk.code
         while f.ip<len(c):
             op,arg=c[f.ip]; f.ip+=1
             if op=='CONST':f.stack.append(f.chunk.constants[arg])
             elif op=='LOAD':f.stack.append(env.getv(arg))
-            elif op=='IMPORT': f.stack.append(load_module(arg, os.getcwd(), getattr(self,'cache',{})))
+            elif op=='IMPORT': f.stack.append(load_module(arg, self.base_dir, self.cache))
             elif op=='EXPORT':
                 if exports is not None: exports[arg]=f.stack.pop()
                 else: f.stack.pop()
@@ -308,9 +353,13 @@ class VM:
                 a=f.stack.pop()
                 if a is None and op=='GET_SAFE': f.stack.append(None)
                 elif a is None: raise EdgError('null value accessed without ?.')
-                elif isinstance(a,dict): f.stack.append(a.get(arg))
+                elif isinstance(a,dict):
+                    method = _method(a, arg)
+                    f.stack.append(method if method is not None else a.get(arg))
                 elif isinstance(a,Instance): f.stack.append(a.get(arg))
-                else: f.stack.append(getattr(a,arg,None))
+                else:
+                    method = _method(a, arg)
+                    f.stack.append(method if method is not None else getattr(a, arg, None))
             elif op=='INDEX':b=f.stack.pop();a=f.stack.pop();f.stack.append(a[b])
             elif op=='DUP2':
                 # [obj, index] -> [obj, index, obj, index]
@@ -329,11 +378,31 @@ class VM:
             elif op=='RETURN':return f.stack.pop() if f.stack else None
         return None
 
+def install_builtins(env):
+    """安装不依赖宿主框架的基础标准库函数。"""
+    env.update({
+        'print': lambda *x: print(*x),
+        'len': len,
+        'range': lambda *x: list(range(*x)),
+        'type': lambda x: 'nothing' if x is None else ('number' if isinstance(x, (int, float)) else ('text' if isinstance(x, str) else ('list' if isinstance(x, list) else 'object'))),
+        'min': min,
+        'max': max,
+        'sum': sum,
+        'abs': abs,
+        'str': str,
+        'int': int,
+        'float': float,
+        'bool': bool,
+    })
+
+
 def run(path):
     try:
         with open(path,encoding='utf8') as f: lines=lines_of(f.read())
         compiler=Compiler(); chunk=compiler.compile_lines(lines); env=Env()
-        env['print']=lambda *x:print(*x)
+        install_builtins(env)
+        source_dir = os.path.dirname(os.path.abspath(path))
+        env['__file__'] = path
         if edg_hot is not None:
             env['hot']=edg_hot
             try:
@@ -341,11 +410,8 @@ def run(path):
                 env['nearby']=nearby
             except ImportError:
                 pass
-        env['len']=lambda x:len(x)
-        env['range']=lambda *x:list(range(*x))
-
-        env['type']=lambda x: 'nothing' if x is None else ('number' if isinstance(x,(int,float)) else ('text' if isinstance(x,str) else ('list' if isinstance(x,list) else 'object')))
-        vm=VM({}); vm.run(chunk,env); return 0
+            # install_builtins 已安装 len/range/type 及其他基础函数
+        vm=VM({}, base_dir=source_dir); vm.run(chunk,env); return 0
     except (EdgError,FileNotFoundError,TypeError,KeyError,IndexError,StopIteration) as e:
         print('EDG error:',e,file=sys.stderr); return 1
 
