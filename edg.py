@@ -13,6 +13,18 @@ from edg02 import EdgError, lines_of
 from edg03 import Compiler, run
 
 
+def dump(path):
+    """编译并打印字节码，便于调试语言实现。"""
+    try:
+        with open(path, encoding="utf8") as f:
+            chunk = Compiler().compile_lines(lines_of(f.read()))
+        print(chunk.disassemble(path))
+        return 0
+    except (EdgError, OSError, TypeError, ValueError) as exc:
+        print(f"EDG dump error: {exc}", file=sys.stderr)
+        return 1
+
+
 def check(path):
     """只解析和编译，不执行程序。"""
     try:
@@ -30,7 +42,7 @@ def main():
     if args in (["--repl"], ["-i"]):
         from edg_repl import main as repl_main
         return repl_main()
-    if len(args) == 2 and args[0] in ("run", "check"):
+    if len(args) == 2 and args[0] in ("run", "check", "dump"):
         command, filename = args
     elif len(args) == 1 and args[0] not in ("-h", "--help"):
         # 保留旧用法：edg.py file.edg 等价于 edg.py run file.edg
@@ -38,6 +50,7 @@ def main():
     else:
         print("用法: python3 edg.py run <file.edg>")
         print("检查: python3 edg.py check <file.edg>")
+        print("字节码: python3 edg.py dump <file.edg>")
         print("交互模式: python3 edg.py --repl")
         print("旧用法: python3 edg.py <file.edg>")
         return 0 if args in (["-h"], ["--help"]) else 2
@@ -45,7 +58,11 @@ def main():
     if not os.path.isfile(path):
         print(f"EDG error: file not found: {filename}", file=sys.stderr)
         return 1
-    return check(path) if command == "check" else run(path)
+    if command == "check":
+        return check(path)
+    if command == "dump":
+        return dump(path)
+    return run(path)
 
 
 
