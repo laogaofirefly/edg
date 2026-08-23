@@ -13,6 +13,24 @@ from edg02 import EdgError, lines_of
 from edg03 import Compiler, run
 
 
+def diagnostic(path, exc, line=None):
+    """将异常转换为统一的文件、行号和源码指针诊断。"""
+    message = str(exc)
+    import re
+    if line is None:
+        match = re.search(r'line (\d+)', message)
+        line = int(match.group(1)) if match else 1
+    try:
+        with open(path, encoding="utf8") as source:
+            source_line = source.read().splitlines()[line - 1]
+    except (OSError, IndexError):
+        source_line = ""
+    print(f"{path}:{line}:1: {message}", file=sys.stderr)
+    if source_line:
+        print(f"    {source_line}", file=sys.stderr)
+        print("    ^", file=sys.stderr)
+
+
 def dump(path):
     """编译并打印字节码，便于调试语言实现。"""
     try:
@@ -21,7 +39,7 @@ def dump(path):
         print(chunk.disassemble(path))
         return 0
     except (EdgError, OSError, TypeError, ValueError) as exc:
-        print(f"EDG dump error: {exc}", file=sys.stderr)
+        diagnostic(path, exc)
         return 1
 
 
@@ -33,7 +51,7 @@ def check(path):
         print(f"OK: {path}")
         return 0
     except (EdgError, OSError, TypeError, ValueError) as exc:
-        print(f"EDG check error: {exc}", file=sys.stderr)
+        diagnostic(path, exc)
         return 1
 
 
