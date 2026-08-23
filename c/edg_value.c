@@ -137,6 +137,25 @@ char *edg_value_to_string(const EdgValue *v) {
     if (v->type == EDG_VALUE_ARRAY) return edg_strdup("[array]");
     return edg_strdup("[value]");
 }
+char *edg_value_array_join(const EdgValue *v, const char *separator) {
+    EdgArray *a = v && v->type == EDG_VALUE_ARRAY ? v->as.object : NULL;
+    const char *sep = separator ? separator : "";
+    size_t total = 1, sep_len = strlen(sep);
+    if (!a) return edg_strdup("");
+    for (size_t i = 0; i < a->length; ++i) {
+        char *part = edg_value_to_string(&a->items[i]);
+        if (!part) return NULL;
+        total += strlen(part); if (i) total += sep_len; free(part);
+    }
+    char *out = malloc(total); if (!out) return NULL; out[0] = '\0';
+    for (size_t i = 0; i < a->length; ++i) {
+        char *part = edg_value_to_string(&a->items[i]);
+        if (i) strcat(out, sep);
+        strcat(out, part);
+        free(part);
+    }
+    return out;
+}
 int edg_value_truthy(const EdgValue *v) {
     if (!v || v->type == EDG_VALUE_NOTHING) return 0;
     if (v->type == EDG_VALUE_BOOL) return v->as.boolean;

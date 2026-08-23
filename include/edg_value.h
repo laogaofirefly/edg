@@ -46,6 +46,7 @@ int edg_value_array_clear(EdgValue *value);
 int edg_value_array_compact(EdgValue *value);
 int edg_value_array_contains(const EdgValue *value, const EdgValue *item);
 char *edg_value_to_string(const EdgValue *value);
+char *edg_value_array_join(const EdgValue *value, const char *separator);
 int edg_value_truthy(const EdgValue *value);
 
 #ifdef __cplusplus

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "edg_value.h"
 
 int main(void) {
@@ -13,8 +14,11 @@ int main(void) {
         edg_value_free(&got); edg_value_free(&number); edg_value_free(&text); edg_value_free(&values);
         return 1;
     }
-    printf("len=%zu text=%s truthy=%d\n", edg_value_array_len(&values),
-           edg_value_string_get(&got), edg_value_truthy(&values));
+    char *joined = edg_value_array_join(&values, ",");
+    if (!joined) { edg_value_free(&got); edg_value_free(&number); edg_value_free(&text); edg_value_free(&values); return 1; }
+    printf("len=%zu text=%s joined=%s truthy=%d\n", edg_value_array_len(&values),
+           edg_value_string_get(&got), joined, edg_value_truthy(&values));
+    free(joined);
     edg_value_free(&got); edg_value_free(&number); edg_value_free(&text); edg_value_free(&values);
     return 0;
 }
