@@ -22,6 +22,7 @@ class NativeCompiler:
         self.names = set()
         self.functions = set()
         self.return_mode = False
+        self.loop_depth = 0
 
     def emit(self, text):
         self.target.append("    " * self.indent + text + "\n")
@@ -128,10 +129,35 @@ class NativeCompiler:
             if text.startswith("while "):
                 condition = text[6:].strip()
                 self.emit(f"while ({self.expr(parse_expr(condition))}) {{")
-                self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1; self.emit("}")
+                self.loop_depth += 1
+                self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1
+                self.loop_depth -= 1; self.emit("}")
                 continue
+            if text.startswith("for "):
+                m = re.fullmatch(r"for\s+([A-Za-z_]\w*)\s+in\s+range\((.*?)\)", text)
+                if not m:
+                    raise EdgError(f"line {line}: native for currently requires range()")
+                var, raw = m.groups()
+                parts = [p.strip() for p in raw.split(",") if p.strip()]
+                if len(parts) == 1:
+                    start, stop, step = "0", parts[0], "1"
+                elif len(parts) == 2:
+                    start, stop, step = parts[0], parts[1], "1"
+                elif len(parts) == 3:
+                    start, stop, step = parts
+                else:
+                    raise EdgError(f"line {line}: range expects 1 to 3 arguments")
+                self.emit(f"for (double {var} = {self.expr(parse_expr(start))}; {var} < {self.expr(parse_expr(stop))}; {var} += {self.expr(parse_expr(step))}) {{")
+                self.loop_depth += 1
+                self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1
+                self.loop_depth -= 1; self.emit("}")
+                continue
+            if text == "break" or text == "continue":
+                if self.loop_depth == 0:
+                    raise EdgError(f"line {line}: {text} outside loop")
+                self.emit(text + ";"); i += 1; continue
             if text == "pass": self.emit(";"); i += 1; continue
-            if text.startswith("fn ") or text.startswith("for "):
+            if text.startswith("fn "): 
                 raise EdgError(f"line {line}: construct is not supported by native backend yet")
             raise EdgError(f"line {line}: unsupported native statement '{text}'")
         return i
