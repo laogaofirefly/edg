@@ -1,0 +1,13 @@
+import world
+
+let game = world.World()
+let hero = world.body("hero", 0, 0, 2, 0)
+let enemy = world.body("enemy", 1, 0, 0, 0)
+game.add(hero)
+game.add(enemy)
+game.tick(0.5)
+print(hero.x)
+print(game.size())
+print(game.nearby(2, 2))
+print(len(game.hit_box(0, 0, 2, 2)))
+print(len(game.collisions()))

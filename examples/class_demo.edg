@@ -1,0 +1,9 @@
+class Player
+    var health = 100
+
+    fn damage(value)
+        self.health -= value
+
+let player = Player()
+player.damage(10)
+print(player.health)

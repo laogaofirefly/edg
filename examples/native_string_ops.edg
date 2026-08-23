@@ -1,0 +1,5 @@
+let name = "EDG"
+if name == "EDG"
+    print(len(name))
+if name != "VM"
+    print("matched")

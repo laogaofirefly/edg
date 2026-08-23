@@ -1,0 +1,5 @@
+let data = {"hp": 100, "name": "hero"}
+data["hp"] -= 25
+data["name"] = "player"
+print(data["hp"])
+print(data["name"])

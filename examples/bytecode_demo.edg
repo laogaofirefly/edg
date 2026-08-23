@@ -1,0 +1,9 @@
+let values = [2, 3, 4]
+
+fn square(x)
+    return x * x
+
+print(square(values[1]))
+
+if values[0] < values[2]
+    print("bytecode ok")

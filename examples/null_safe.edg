@@ -1,0 +1,12 @@
+let target? = nothing
+let name = target?.name ?? "Unknown"
+print(name)
+
+fn add(a, b)
+    return a * 2 + b
+
+let result = add(10, 5)
+if result >= 20
+    print("pass")
+else
+    print("fail")

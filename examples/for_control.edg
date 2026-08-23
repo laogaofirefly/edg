@@ -1,0 +1,11 @@
+let total = 0
+for n in range(0, 6)
+    if n == 2
+        continue
+    if n == 5
+        break
+    total += n
+print(total)
+
+for x in [1, 2, 3]
+    print(x)

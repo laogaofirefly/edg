@@ -1,0 +1,16 @@
+let text = "  hello,edg  "
+print(text.trim().upper())
+print(text.contains("edg"))
+print(text.replace("edg", "world"))
+
+let values = [1, 2, 3]
+values.push(4)
+print(values.join("-"))
+print(values.contains(2))
+print(values.pop())
+print(len(values))
+
+let player = {"name": "hero", "hp": 100}
+print(player.has("hp"))
+print(player.get("mana", 0))
+print(player.keys().join(","))
