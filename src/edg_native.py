@@ -17,7 +17,10 @@ from edg_native_runtime import RUNTIME_C
 
 class NativeCompiler:
     def __init__(self):
-        self.lines = [RUNTIME_C + "\n"]
+        # Keep the old generated helpers isolated while the public C Runtime
+        # is introduced.  This prevents duplicate EdgValue/EDG_* symbols and
+        # lets generated programs link the shared ABI incrementally.
+        self.lines = ["#include \"__EDG_VALUE_HEADER__\"\n" + RUNTIME_C + "\n"]
         self.lines += ["\n", "static char *edg_concat(const char *a, const char *b) {\n", "    size_t n = strlen(a) + strlen(b) + 1;\n", "    char *s = malloc(n);\n", "    if (!s) return NULL;\n", "    strcpy(s, a);\n", "    strcat(s, b);\n", "    return s;\n", "}\n"]
         self.lines += ["\n", "static double edg_array_get(const double *a, size_t n, int i) {\n", "    if (i < 0 || (size_t)i >= n) {\n", "        fprintf(stderr, \"EDG array index out of bounds: %d (length %zu)\\n\", i, n);\n", "        exit(1);\n", "    }\n", "    return a[i];\n", "}\n", "\n", "static void edg_array_set(double *a, size_t n, int i, double value) {\n", "    if (i < 0 || (size_t)i >= n) {\n", "        fprintf(stderr, \"EDG array index out of bounds: %d (length %zu)\\n\", i, n);\n", "        exit(1);\n", "    }\n", "    a[i] = value;\n", "}\n"]
         self.functions_code = []
@@ -412,9 +415,9 @@ class NativeCompiler:
         # 函数体是在主函数编译过程中收集的，插入到 main 之前。
         if self.functions_code:
             self.lines[2:2] = self.functions_code
-        return "".join(self.lines)
-
-
+        # Generated code still uses the compatibility layout for now; rename
+        # it explicitly so the public EdgValue ABI remains available beside it.
+        return "".join(self.lines).replace("__EDG_VALUE_HEADER__", "edg_value.h").replace("EdgValue", "EdgLegacyValue")
 def compile_source(source):
     return NativeCompiler().compile(source)
 
