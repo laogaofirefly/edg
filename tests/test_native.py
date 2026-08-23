@@ -22,9 +22,10 @@ def run_native(source):
 
 
 assert run_native("""let greeting = "hello EDG"
-print(greeting)
+let suffix = " native"
+print(greeting + suffix)
 print("native string")
-""") == "hello EDG\nnative string\n"
+""") == "hello EDG native\nnative string\n"
 assert run_native("""let total = 0
 for i in range(5, 0, -2)
     total += i

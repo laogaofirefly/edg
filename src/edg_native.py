@@ -17,6 +17,7 @@ from edg02 import EdgError, lines_of, parse_expr
 class NativeCompiler:
     def __init__(self):
         self.lines = ["#include <stdio.h>\n", "#include <stdbool.h>\n", "#include <stdlib.h>\n", "#include <string.h>\n", "\n", "static char *edg_num_to_str(double x) {\n", "    char *s = malloc(64);\n", "    if (!s) return NULL;\n", "    snprintf(s, 64, \"%g\", x);\n", "    return s;\n", "}\n"]
+        self.lines += ["\n", "static char *edg_concat(const char *a, const char *b) {\n", "    size_t n = strlen(a) + strlen(b) + 1;\n", "    char *s = malloc(n);\n", "    if (!s) return NULL;\n", "    strcpy(s, a);\n", "    strcat(s, b);\n", "    return s;\n", "}\n"]
         self.functions_code = []
         self.target = self.lines
         self.indent = 1
@@ -31,6 +32,19 @@ class NativeCompiler:
     def emit(self, text):
         self.target.append("    " * self.indent + text + "\n")
 
+    def is_string(self, node):
+        if isinstance(node, str):
+            return True
+        if not isinstance(node, tuple):
+            return False
+        if node[0] == "name":
+            return node[1] in self.string_names
+        if node[0] == "bin" and node[1] == "+":
+            return self.is_string(node[2]) or self.is_string(node[3])
+        if node[0] == "call" and isinstance(node[1], tuple) and node[1][0] == "name":
+            return node[1][1] == "str"
+        return False
+
     def expr(self, node):
         if not isinstance(node, tuple):
             if node is None: return "0.0"
@@ -44,9 +58,15 @@ class NativeCompiler:
         if kind == "unary": return f"({node[1]}{self.expr(node[2])})"
         if kind == "bin":
             op = node[1]
+            if op == "+" and (self.is_string(node[2]) or self.is_string(node[3])):
+                return f"edg_concat({self.expr(node[2])}, {self.expr(node[3])})"
+            left = self.expr(node[2])
+            right = self.expr(node[3])
+            if op == "+" and (self.is_string(node[2]) or self.is_string(node[3])):
+                return f"edg_concat({left}, {right})"
             if op in ("and", "or"):
                 op = "&&" if op == "and" else "||"
-            return f"({self.expr(node[2])} {op} {self.expr(node[3])})"
+            return f"({left} {op} {right})"
         if kind == "call":
             fn = node[1]
             if isinstance(fn, tuple) and fn[0] == "name":
@@ -130,7 +150,7 @@ class NativeCompiler:
             if m:
                 node = parse_expr(m.group(1).strip())
                 value = self.expr(node)
-                if isinstance(node, str) or (isinstance(node, tuple) and node[0] == "name" and node[1] in self.string_names):
+                if self.is_string(node):
                     self.emit(f"printf(\"%s\\n\", {value});")
                 else:
                     self.emit(f"printf(\"%g\\n\", {value});")
