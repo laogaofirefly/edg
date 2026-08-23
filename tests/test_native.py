@@ -32,6 +32,11 @@ if name == "EDG"
 if name != "VM"
     print("matched")
 """) == "3\nmatched\n"
+assert run_native("""let values = [10, 20, 30]
+print(values[1])
+values[2] = 42
+print(values[2])
+""") == "20\n42\n"
 assert run_native("""let total = 0
 for i in range(5, 0, -2)
     total += i

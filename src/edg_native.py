@@ -23,6 +23,7 @@ class NativeCompiler:
         self.indent = 1
         self.names = set()
         self.string_names = set()
+        self.array_names = set()
         self.functions = set()
         self.return_mode = False
         self.loop_depth = 0
@@ -33,6 +34,8 @@ class NativeCompiler:
         self.target.append("    " * self.indent + text + "\n")
 
     def is_string(self, node):
+        if isinstance(node, list):
+            return False
         if isinstance(node, str):
             return True
         if not isinstance(node, tuple):
@@ -55,6 +58,18 @@ class NativeCompiler:
             return repr(float(node))
         kind = node[0]
         if kind == "name": return node[1]
+        if kind == "list":
+            items = node[1]
+            if not items:
+                raise EdgError("line: native arrays cannot be empty")
+            if any(self.is_string(x) for x in items):
+                raise EdgError("native arrays currently support numeric elements only")
+            return "{" + ", ".join(self.expr(x) for x in items) + "}"
+        if kind == "index":
+            base, index = node[1], node[2]
+            if isinstance(base, tuple) and base[0] == "name" and base[1] in self.array_names:
+                return f"{self.expr(base)}[(int)({self.expr(index)})]"
+            raise EdgError("native indexing is supported for numeric arrays only")
         if kind == "unary": return f"({node[1]}{self.expr(node[2])})"
         if kind == "bin":
             op = node[1]
@@ -82,6 +97,10 @@ class NativeCompiler:
                     return f"edg_num_to_str({x})"
                 if name == "len" and len(node[2]) == 1 and self.is_string(node[2][0]):
                     return f"((double)strlen({self.expr(node[2][0])}))"
+                if name == "len" and len(node[2]) == 1:
+                    arg = node[2][0]
+                    if isinstance(arg, tuple) and arg[0] == "name" and arg[1] in self.array_names:
+                        raise EdgError("native array length requires a fixed-size array declaration")
                 if name in self.functions:
                     return f"{name}({', '.join(self.expr(a) for a in node[2])})"
             raise EdgError("native backend does not support this function call")
@@ -143,8 +162,21 @@ class NativeCompiler:
                 if isinstance(node, str):
                     self.string_names.add(name)
                     self.emit(f"char *{name} = {self.expr(node)};")
+                elif isinstance(node, tuple) and node[0] == "list":
+                    items = node[1]
+                    if not items or any(self.is_string(x) for x in items):
+                        raise EdgError(f"line {line}: native arrays require non-empty numeric elements")
+                    self.array_names.add(name)
+                    self.emit(f"double {name}[{len(items)}] = {self.expr(node)};")
                 else:
                     self.emit(f"double {name} = {self.expr(node)};")
+                i += 1; continue
+            m = re.fullmatch(r"([A-Za-z_]\w*)\[([^]]+)\]\s*=\s*(.+)", text)
+            if m:
+                name, index, rhs = m.groups()
+                if name not in self.array_names:
+                    raise EdgError(f"line {line}: native indexed assignment requires an array")
+                self.emit(f"{name}[(int)({self.expr(parse_expr(index))})] = {self.expr(parse_expr(rhs))};")
                 i += 1; continue
             m = re.fullmatch(r"([A-Za-z_]\w*)\s*(=|\+=|-=|\*=|/=)\s*(.+)", text)
             if m:
