@@ -60,6 +60,9 @@ class NativeCompiler:
             op = node[1]
             if op == "+" and (self.is_string(node[2]) or self.is_string(node[3])):
                 return f"edg_concat({self.expr(node[2])}, {self.expr(node[3])})"
+            if op in ("==", "!=") and (self.is_string(node[2]) or self.is_string(node[3])):
+                cmp = "== 0" if op == "==" else "!= 0"
+                return f"(strcmp({self.expr(node[2])}, {self.expr(node[3])}) {cmp})"
             left = self.expr(node[2])
             right = self.expr(node[3])
             if op == "+" and (self.is_string(node[2]) or self.is_string(node[3])):
@@ -77,6 +80,8 @@ class NativeCompiler:
                 if name == "str" and len(node[2]) == 1:
                     x = self.expr(node[2][0])
                     return f"edg_num_to_str({x})"
+                if name == "len" and len(node[2]) == 1 and self.is_string(node[2][0]):
+                    return f"((double)strlen({self.expr(node[2][0])}))"
                 if name in self.functions:
                     return f"{name}({', '.join(self.expr(a) for a in node[2])})"
             raise EdgError("native backend does not support this function call")

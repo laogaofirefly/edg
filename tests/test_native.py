@@ -26,6 +26,12 @@ let suffix = " native"
 print(greeting + suffix)
 print("native string")
 """) == "hello EDG native\nnative string\n"
+assert run_native("""let name = "EDG"
+if name == "EDG"
+    print(len(name))
+if name != "VM"
+    print("matched")
+""") == "3\nmatched\n"
 assert run_native("""let total = 0
 for i in range(5, 0, -2)
     total += i
