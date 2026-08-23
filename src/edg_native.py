@@ -9,17 +9,19 @@ import re
 import shutil
 import subprocess
 import tempfile
+import json
 
 from edg02 import EdgError, lines_of, parse_expr
 
 
 class NativeCompiler:
     def __init__(self):
-        self.lines = ["#include <stdio.h>\n", "#include <stdbool.h>\n"]
+        self.lines = ["#include <stdio.h>\n", "#include <stdbool.h>\n", "#include <stdlib.h>\n", "#include <string.h>\n", "\n", "static char *edg_num_to_str(double x) {\n", "    char *s = malloc(64);\n", "    if (!s) return NULL;\n", "    snprintf(s, 64, \"%g\", x);\n", "    return s;\n", "}\n"]
         self.functions_code = []
         self.target = self.lines
         self.indent = 1
         self.names = set()
+        self.string_names = set()
         self.functions = set()
         self.return_mode = False
         self.loop_depth = 0
@@ -35,7 +37,7 @@ class NativeCompiler:
             if node is True: return "1.0"
             if node is False: return "0.0"
             if isinstance(node, str):
-                raise EdgError("native backend only supports numeric expressions")
+                return json.dumps(node)
             return repr(float(node))
         kind = node[0]
         if kind == "name": return node[1]
@@ -52,6 +54,9 @@ class NativeCompiler:
                 if name == "abs" and len(node[2]) == 1:
                     x = self.expr(node[2][0])
                     return f"(({x}) < 0 ? -({x}) : ({x}))"
+                if name == "str" and len(node[2]) == 1:
+                    x = self.expr(node[2][0])
+                    return f"edg_num_to_str({x})"
                 if name in self.functions:
                     return f"{name}({', '.join(self.expr(a) for a in node[2])})"
             raise EdgError("native backend does not support this function call")
@@ -109,7 +114,12 @@ class NativeCompiler:
                 m = re.fullmatch(r"(?:let|var)\s+([A-Za-z_]\w*)\s*=\s*(.+)", text)
                 if not m: raise EdgError(f"line {line}: invalid native declaration")
                 name, rhs = m.groups(); self.names.add(name)
-                self.emit(f"double {name} = {self.expr(parse_expr(rhs))};")
+                node = parse_expr(rhs)
+                if isinstance(node, str):
+                    self.string_names.add(name)
+                    self.emit(f"char *{name} = {self.expr(node)};")
+                else:
+                    self.emit(f"double {name} = {self.expr(node)};")
                 i += 1; continue
             m = re.fullmatch(r"([A-Za-z_]\w*)\s*(=|\+=|-=|\*=|/=)\s*(.+)", text)
             if m:
@@ -118,8 +128,12 @@ class NativeCompiler:
                 i += 1; continue
             m = re.fullmatch(r"print\((.*)\)", text)
             if m:
-                value = self.expr(parse_expr(m.group(1).strip()))
-                self.emit(f"printf(\"%g\\n\", {value});")
+                node = parse_expr(m.group(1).strip())
+                value = self.expr(node)
+                if isinstance(node, str) or (isinstance(node, tuple) and node[0] == "name" and node[1] in self.string_names):
+                    self.emit(f"printf(\"%s\\n\", {value});")
+                else:
+                    self.emit(f"printf(\"%g\\n\", {value});")
                 i += 1; continue
             if text.startswith("if "):
                 condition = text[3:].strip()
