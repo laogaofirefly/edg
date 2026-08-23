@@ -60,6 +60,15 @@ def main():
     if args in (["--repl"], ["-i"]):
         from edg_repl import main as repl_main
         return repl_main()
+    if len(args) == 1 and args[0] == "test":
+        import subprocess
+        test_dir = os.path.join(ROOT, "tests")
+        scripts = ["test_runner.py", "test_errors.py"]
+        status = 0
+        for script in scripts:
+            result = subprocess.run([sys.executable, os.path.join(test_dir, script)], cwd=ROOT)
+            status = status or result.returncode
+        return status
     if len(args) == 2 and args[0] in ("run", "check", "dump"):
         command, filename = args
     elif len(args) == 1 and args[0] not in ("-h", "--help"):
@@ -69,6 +78,7 @@ def main():
         print("用法: python3 edg.py run <file.edg>")
         print("检查: python3 edg.py check <file.edg>")
         print("字节码: python3 edg.py dump <file.edg>")
+        print("测试: python3 edg.py test")
         print("交互模式: python3 edg.py --repl")
         print("旧用法: python3 edg.py <file.edg>")
         return 0 if args in (["-h"], ["--help"]) else 2

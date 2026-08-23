@@ -221,7 +221,9 @@ class ByteFunction:
         self.name=name; self.params=params; self.chunk=chunk; self.closure=closure
     def __call__(self,*args):
         required=len([p for p,d in self.params if d is None])
-        if len(args)<required or len(args)>len(self.params): raise EdgError(f'function {self.name} argument count mismatch')
+        if len(args)<required or len(args)>len(self.params):
+            owner = self.closure
+            raise runtime_error(owner, f'function {self.name} expects {len(self.params)} arguments, got {len(args)}')
         env=Env(self.closure)
         for index,(param,default) in enumerate(self.params):
             env[param]=args[index] if index<len(args) else (default() if callable(default) else default)
@@ -397,9 +399,17 @@ class VM:
             elif op=='SET_INDEX':
                 value=f.stack.pop(); index=f.stack.pop(); obj=f.stack.pop()
                 try: obj[index]=value
-                except (TypeError, KeyError, IndexError) as e: raise EdgError(f'cannot assign index: {e}')
+                except (TypeError, KeyError, IndexError) as e: raise runtime_error(f.env, f'cannot assign index: {e}')
             elif op=='CALL':
-                args=f.stack[-arg:] if arg else []; del f.stack[len(f.stack)-arg:]; fn=f.stack.pop(); f.stack.append(fn(*args))
+                args=f.stack[-arg:] if arg else []
+                del f.stack[len(f.stack)-arg:]
+                fn=f.stack.pop()
+                try:
+                    f.stack.append(fn(*args))
+                except EdgError:
+                    raise
+                except TypeError as e:
+                    raise runtime_error(f.env, f'call failed: {e}')
             elif op=='MAKE_FUNCTION':
                 name,params,sub=arg; f.stack.append(ByteFunction(name,params,sub,env))
             elif op=='JUMP':f.ip=arg
