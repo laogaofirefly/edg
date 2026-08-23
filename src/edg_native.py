@@ -74,11 +74,21 @@ class NativeCompiler:
                 condition = text[3:].strip()
                 self.emit(f"if ({self.expr(parse_expr(condition))}) {{")
                 self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1; self.emit("}")
-                if i < len(rows) and rows[i][0] == level and rows[i][1] == "else":
-                    self.emit("else {"); self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1; self.emit("}")
+                while i < len(rows) and rows[i][0] == level and (rows[i][1].startswith("elif ") or rows[i][1] == "else"):
+                    branch = rows[i][1]
+                    if branch == "else":
+                        self.emit("else {")
+                    else:
+                        self.emit(f"else if ({self.expr(parse_expr(branch[5:].strip()))}) {{")
+                    self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1; self.emit("}")
+                continue
+            if text.startswith("while "):
+                condition = text[6:].strip()
+                self.emit(f"while ({self.expr(parse_expr(condition))}) {{")
+                self.indent += 1; i = self.block(rows, i + 1, level); self.indent -= 1; self.emit("}")
                 continue
             if text == "pass": self.emit(";"); i += 1; continue
-            if text.startswith("fn ") or text.startswith("for ") or text.startswith("while "):
+            if text.startswith("fn ") or text.startswith("for "):
                 raise EdgError(f"line {line}: construct is not supported by native backend yet")
             raise EdgError(f"line {line}: unsupported native statement '{text}'")
         return i
